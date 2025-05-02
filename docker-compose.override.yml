@@ -1,0 +1,15 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    ports:
+      - "8080:8000"  # Laravel
+      - "5173:5173"  # Vite
+    volumes:
+      - .:/var/www/html
+    command: >
+      sh -c "cd /var/www/html &&
+            npm install --legacy-peer-deps &&
+            composer install &&
+            php artisan serve --host=0.0.0.0 --port=8000"
