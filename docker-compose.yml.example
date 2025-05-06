@@ -19,7 +19,7 @@ services:
     image: postgres:14
     container_name: proyecto3_database
     ports:
-      - "${DB_PORT}:5432"
+      - "5432:${DB_PORT}"
     environment:
       POSTGRES_DB: ${DB_DATABASE}
       POSTGRES_USER: ${DB_USERNAME}
