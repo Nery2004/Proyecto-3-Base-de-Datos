@@ -2,7 +2,7 @@
 
 @section('content')
 <div class="container py-4">
-    <h1 class="mb-4">Reportes de Biblioteca</h1>
+    <h1 class="mb-4 text-center text-light">Reportes de Biblioteca</h1>
 
     {{-- REPORTES --}}
     <div class="row row-cols-1 row-cols-md-2 g-4 mb-4">
@@ -42,7 +42,7 @@
             <h5 class="card-title">Resultados</h5>
             <div class="table-responsive">
                 <table class="table table-striped align-middle">
-                    <thead class="table-light">
+                    <thead>
                         @switch($type)
                             @case('top_books')
                                 <tr>
@@ -125,11 +125,11 @@
 
             {{-- EXPORTAR --}}
             <div class="d-flex justify-content-end">
-                <a href="{{ route('reports.exportPdf', request()->query()) }}" class="btn btn-danger me-2">
+                <a href="{{ route('reports.exportPdf', request()->query()) }}" class="btn btn-outline-danger me-2">
                     <i class="bi bi-file-earmark-pdf"></i> PDF
                 </a>
-                <a href="{{ route('reports.exportExcel', request()->query()) }}" class="btn btn-success">
-                    <i class="bi bi-file-earmark-excel"></i> Excel
+                <a href="{{ route('reports.exportExcel', request()->query()) }}" class="btn btn-outline-success">
+                    <i class="bi bi-file-earmark-excel"></i> CSV
                 </a>
             </div>
         </div>

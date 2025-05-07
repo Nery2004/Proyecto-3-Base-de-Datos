@@ -35,7 +35,7 @@
                 </div>
 
                 <div class="col-12 text-end">
-                    <button type="submit" class="btn btn-primary">Filtrar</button>
+                    <button type="submit" class="btn btn-outline-primary">Filtrar</button>
                 </div>
             </form>
         </div>
