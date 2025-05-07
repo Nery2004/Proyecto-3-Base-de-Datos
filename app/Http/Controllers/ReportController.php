@@ -17,28 +17,28 @@ use ConsoleTVs\Charts\Classes\Chartjs\Chart;
 class ReportController extends Controller
 {
     public function index(Request $request)
-    {
-        // Recogemos filtros
+    {        
         $type    = $request->input('report_type', 'top_books');
         $filters = $request->only([
             'start_date','end_date','min_count','limit',
             'editorial_id','category_id','author_id',
             'client_id','bibliotecario_id',
-            'min_days_overdue','max_days_overdue','sanction_reason'
+            'min_days_overdue','max_days_overdue','sanction_reason',
+            'min_loans','max_loans','min_clients'
         ]);
 
-        // Obtenemos datos según tipo
+        $filters['report_type'] = $type;
+
         $data = $this->getData($filters);
 
-        // Sólo para los reportes numéricos, armamos gráfico
-        $numericReports = ['top_books', 'active_clients'];
+        $numericReports = ['top_books', 'active_clients', 'librarian_productivity'];
         $chart = in_array($type, $numericReports)
             ? $this->buildChart($data, $type)
             : null;
 
         $editoriales    = Editorial::pluck('nombre','id');
         $categorias     = Categoria::pluck('categoria','id');
-        $autores        = Autor::pluck('usuario_id','id');       // o nombres
+        $autores        = Autor::pluck('usuario_id','id');
         $clients        = Cliente::with('usuario')->get()->pluck('usuario.nombre','id');
         $bibliotecarios = Bibliotecario::with('usuario')->get()->pluck('usuario.nombre','id');
         
@@ -49,35 +49,35 @@ class ReportController extends Controller
     }
 
     public function exportPdf(Request $request)
-{
-    try {
-        // Obtener los datos basados en los filtros
-        $filters = $request->all();
-        $data = $this->getData($filters);
-        
-        // Cargar la vista en el PDF
-        $pdf = Pdf::loadView('reports.pdf', compact('data', 'filters'));
-        
-        // Configurar opciones adicionales del PDF
-        $pdf->setPaper('a4', 'landscape');
-        $pdf->setOptions([
-            'isHtml5ParserEnabled' => true,
-            'isRemoteEnabled' => true
-        ]);
-        
-        // Nombre del archivo
-        $fileName = "reporte_" . ($filters['report_type'] ?? 'general') . "_" . date('Y-m-d') . ".pdf";
-        
-        // Forzar la descarga
-        return $pdf->download($fileName);
-    } catch (\Exception $e) {
-        // Log del error para diagnóstico
-        \Log::error('Error al generar PDF: ' . $e->getMessage());
-        
-        // Redirigir con mensaje de error
-        return redirect()->back()->with('error', 'No se pudo generar el PDF: ' . $e->getMessage());
+    {
+        try {
+            // Obtener los datos basados en los filtros
+            $filters = $request->all();
+            $data = $this->getData($filters);
+            
+            // Cargar la vista en el PDF
+            $pdf = Pdf::loadView('reports.pdf', compact('data', 'filters'));
+            
+            // Configurar opciones adicionales del PDF
+            $pdf->setPaper('a4', 'landscape');
+            $pdf->setOptions([
+                'isHtml5ParserEnabled' => true,
+                'isRemoteEnabled' => true
+            ]);
+            
+            // Nombre del archivo
+            $fileName = "reporte_" . ($filters['report_type'] ?? 'general') . "_" . date('Y-m-d') . ".pdf";
+            
+            // Forzar la descarga
+            return $pdf->download($fileName);
+        } catch (\Exception $e) {
+            // Log del error para diagnóstico
+            \Log::error('Error al generar PDF: ' . $e->getMessage());
+            
+            // Redirigir con mensaje de error
+            return redirect()->back()->with('error', 'No se pudo generar el PDF: ' . $e->getMessage());
+        }
     }
-}
 
     public function exportExcel(Request $request)
     {
@@ -119,48 +119,54 @@ class ReportController extends Controller
                     ->groupBy('libros.titulo')
                     ->orderByDesc('value')
                     ->limit($limit);
+
                 return $q->get();
 
             // 2) Préstamos Vencidos
             case 'overdue_loans':
                 $q = DB::table('prestamo')
-                    ->join('clientes','prestamo.cliente_id','=','clientes.id')
-                    ->join('usuarios','clientes.usuario_id','=','usuarios.id')
+                    ->join('clientes',      'prestamo.cliente_id',     '=', 'clientes.id')
+                    ->join('usuarios',      'clientes.usuario_id',     '=', 'usuarios.id')
                     ->whereNull('prestamo.devuelto_en')
-                    ->where('prestamo.fecha_devolucion','<', DB::raw('CURRENT_DATE'))
+                    ->where('prestamo.fecha_devolucion', '<', DB::raw('CURRENT_DATE'))
                     ->when($start && $end, fn($q) => $q->whereBetween('prestado_en', [$start, $end]))
-                    ->when($f['min_days_overdue'] ?? null, fn($q,$min) =>
-                        $q->whereRaw("DATE_PART('day', CURRENT_DATE - fecha_devolucion) >= ?", [$min])
+                    ->when($f['min_days_overdue'] ?? null, fn($q, $min) =>
+                        $q->whereRaw('(CURRENT_DATE - fecha_devolucion) >= ?', [$min])
                     )
-                    ->when($f['max_days_overdue'] ?? null, fn($q,$max) =>
-                        $q->whereRaw("DATE_PART('day', CURRENT_DATE - fecha_devolucion) <= ?", [$max])
+                    ->when($f['max_days_overdue'] ?? null, fn($q, $max) =>
+                        $q->whereRaw('(CURRENT_DATE - fecha_devolucion) <= ?', [$max])
                     )
-                    ->when($f['client_id'] ?? null, fn($q,$c) => $q->where('clientes.id',$c))
-                    ->when($f['bibliotecario_id'] ?? null, fn($q,$b) => $q->where('prestamo.bibliotecario_id',$b))
+                    ->when($f['client_id'] ?? null,         fn($q, $c) => $q->where('clientes.id', $c))
+                    ->when($f['bibliotecario_id'] ?? null,  fn($q, $b) => $q->where('prestamo.bibliotecario_id', $b))
                     ->select(
                         'prestamo.id AS loan_id',
                         DB::raw("usuarios.nombre || ' ' || usuarios.apellido AS cliente"),
                         'prestamo.fecha_devolucion',
-                        DB::raw("DATE_PART('day', CURRENT_DATE - fecha_devolucion) AS days_overdue")
+                        DB::raw('(CURRENT_DATE - fecha_devolucion) AS days_overdue')
                     )
                     ->limit($limit);
+
                 return $q->get();
 
             // 3) Clientes con más préstamos activos
             case 'active_clients':
                 $q = DB::table('prestamo')
-                    ->join('clientes','prestamo.cliente_id','=','clientes.id')
-                    ->join('usuarios','clientes.usuario_id','=','usuarios.id')
+                    ->join('clientes', 'prestamo.cliente_id', '=', 'clientes.id')
+                    ->join('usuarios',  'clientes.usuario_id', '=', 'usuarios.id')
                     ->whereNull('prestamo.devuelto_en')
-                    ->when($f['client_id'] ?? null, fn($q,$c) => $q->where('clientes.id',$c))
+                    ->when($start && $end,      fn($q) => $q->whereBetween('prestado_en', [$start, $end]))
+                    ->when($f['bibliotecario_id'] ?? null, fn($q,$b) => $q->where('prestamo.bibliotecario_id', $b))
+
+                    ->when($f['client_id'] ?? null, fn($q,$c) => $q->where('clientes.id', $c))
                     ->select(
                         DB::raw("usuarios.nombre || ' ' || usuarios.apellido AS label"),
-                        DB::raw("count(*) AS value")
+                        DB::raw('COUNT(*) AS value')
                     )
                     ->groupBy('usuarios.nombre','usuarios.apellido')
-                    ->when($min, fn($q) => $q->havingRaw('count(*) >= ?', [$min]))
+                    ->when($min, fn($q) => $q->havingRaw('COUNT(*) >= ?', [$min]))
                     ->orderByDesc('value')
                     ->limit($limit);
+
                 return $q->get();
 
             // 4) Sanciones Vigentes
@@ -184,13 +190,38 @@ class ReportController extends Controller
                         'motivo','fecha_inicio','fecha_final'
                     )
                     ->limit($limit);
+
+                return $q->get();
+
+            // 5) Productividad de Bibliotecarios
+            case 'librarian_productivity':
+                $q = DB::table('prestamo')
+                    ->join('bibliotecarios', 'prestamo.bibliotecario_id', '=', 'bibliotecarios.id')
+                    ->join('usuarios',       'bibliotecarios.usuario_id', '=', 'usuarios.id')
+                    ->when($start && $end, fn($q) => $q->whereBetween('prestado_en', [$start, $end]))
+                    ->when($f['bibliotecario_id'] ?? null, fn($q, $b) => $q->where('bibliotecarios.id', $b))
+            
+                    ->select(
+                        DB::raw("usuarios.nombre || ' ' || usuarios.apellido AS label"),
+                        DB::raw('COUNT(*) AS value'),
+                        DB::raw('COUNT(DISTINCT prestamo.cliente_id) AS unique_clients'),
+                        DB::raw('AVG(dias_prestamos)::numeric(10,2) AS avg_days')
+                    )
+                    ->groupBy('usuarios.nombre','usuarios.apellido')
+            
+                    ->when($f['min_loans'] ?? null,   fn($q,$m) => $q->havingRaw('COUNT(*) >= ?', [$m]))
+                    ->when($f['max_loans'] ?? null,   fn($q,$m) => $q->havingRaw('COUNT(*) <= ?', [$m]))
+                    ->when($f['min_clients'] ?? null, fn($q,$m) => $q->havingRaw('COUNT(DISTINCT prestamo.cliente_id) >= ?', [$m]))
+            
+                    ->orderByDesc('value')
+                    ->limit($limit);
+            
                 return $q->get();
 
             default:
                 return collect();
         }
     }
-
     /**
      * Genera un ChartJS de barras para datos con 'label' y 'value'
      */
