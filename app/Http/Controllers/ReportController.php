@@ -5,8 +5,6 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Barryvdh\DomPDF\Facade\Pdf;
-use Maatwebsite\Excel\Facades\Excel;
-use App\Exports\ReportsExport;
 use App\Models\Editorial;
 use App\Models\Categoria;
 use App\Models\Autor;
@@ -51,41 +49,49 @@ class ReportController extends Controller
     public function exportPdf(Request $request)
     {
         try {
-            // Obtener los datos basados en los filtros
             $filters = $request->all();
             $data = $this->getData($filters);
             
-            // Cargar la vista en el PDF
             $pdf = Pdf::loadView('reports.pdf', compact('data', 'filters'));
             
-            // Configurar opciones adicionales del PDF
             $pdf->setPaper('a4', 'landscape');
             $pdf->setOptions([
                 'isHtml5ParserEnabled' => true,
                 'isRemoteEnabled' => true
             ]);
             
-            // Nombre del archivo
             $fileName = "reporte_" . ($filters['report_type'] ?? 'general') . "_" . date('Y-m-d') . ".pdf";
             
-            // Forzar la descarga
             return $pdf->download($fileName);
         } catch (\Exception $e) {
-            // Log del error para diagnóstico
             \Log::error('Error al generar PDF: ' . $e->getMessage());
             
-            // Redirigir con mensaje de error
             return redirect()->back()->with('error', 'No se pudo generar el PDF: ' . $e->getMessage());
         }
     }
 
     public function exportExcel(Request $request)
     {
-        return Excel::download(
-            new ReportsExport($request->all()),
-            "reporte_{$request->input('report_type')}.xlsx"
-        );
+        $filters = $request->all();
+        $data = $this->getData($filters);
+
+        $filename = 'reporte_' . now()->format('Y-m-d_H-i-s') . '.csv';
+        $headers = ['Content-Type' => 'text/csv', 'Content-Disposition' => "attachment; filename=$filename"];
+
+        $callback = function() use ($data) {
+            $handle = fopen('php://output', 'w');
+            if (!empty($data[0])) {
+                fputcsv($handle, array_keys((array) $data[0]));
+            }
+            foreach ($data as $row) {
+                fputcsv($handle, (array) $row);
+            }
+            fclose($handle);
+        };
+
+        return response()->stream($callback, 200, $headers);
     }
+
 
     /**
      * Devuelve un Collection con los datos del reporte
