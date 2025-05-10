@@ -27,8 +27,8 @@ CREATE TABLE libros (
   titulo VARCHAR NOT NULL,
   autor_id INT REFERENCES autores(id),
   editorial_id INT REFERENCES editoriales(id),
-  cantidad INT NOT NULL CHECK (cantidad > 0),
-  disponible BOOLEAN
+  cantidad INT NOT NULL CHECK (cantidad >= 0),
+  disponible BOOLEAN DEFAULT TRUE
 );
 
 CREATE TABLE autor_libro (
