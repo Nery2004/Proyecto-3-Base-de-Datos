@@ -28,6 +28,39 @@ El proyecto sigue la estructura estándar de Laravel, con carpetas como:
 * PostgreSQL
 * Opcional: Docker y Docker Compose
 
+---
+
+## 🛠️ Instrucciones para ejecutar el proyecto
+
+1. **Clona el repositorio:**
+
+   ```bash
+   git clone https://github.com/Nery2004/Proyecto-3-Base-de-Datos.git
+   cd Proyecto-3-Base-de-Datos
+   ```
+
+2. **Conéctate a tu base de datos PostgreSQL** (puedes usar `psql`, PgAdmin u otra herramienta).
+
+3. **Ejecuta el archivo de DDL para crear las tablas:**
+
+   ```sql
+   \i path/al/archivo/ddl.sql
+   ```
+
+4. **Ejecuta el archivo de triggers:**
+
+   ```sql
+   \i path/al/archivo/triggers.sql
+   ```
+
+5. **Ejecuta el archivo de inserción de datos (data.sql):**
+
+   ```sql
+   \i path/al/archivo/data.sql
+   ```
+
+> 🔁 Asegúrate de reemplazar `path/al/archivo/` con la ruta correcta donde están ubicados los archivos `.sql` dentro del repositorio.
+
 ## 🛠️ Instalación y ejecución
 
 ### Opción 1: Instalación manual
